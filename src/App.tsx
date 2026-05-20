@@ -668,7 +668,15 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!authReady || !effectiveWorkspaceId) {
+    if (!authReady) return;
+
+    if (!user) {
+      const saved = localStorage.getItem('crm_whatsapp_accounts');
+      setWhatsappAccounts(saved ? JSON.parse(saved) : []);
+      return;
+    }
+
+    if (!effectiveWorkspaceId) {
       setWhatsappAccounts([]);
       return;
     }
@@ -682,11 +690,9 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [authReady, effectiveWorkspaceId]);
+  }, [authReady, user, effectiveWorkspaceId]);
 
   const saveWhatsappAccount = async () => {
-    if (!user || !effectiveWorkspaceId) return;
-    
     if (!whatsappForm.name || !whatsappForm.identifier) {
       alert("Por favor, preencha o Nome e o ID (Número p/ Ícone).");
       return;
@@ -698,6 +704,32 @@ export default function App() {
       ...whatsappForm,
       id
     } as WhatsAppAccount;
+
+    if (!user) {
+      // Offline / guest mode local storage
+      const exists = whatsappAccounts.some(a => a.id === id);
+      const updatedAccounts = exists
+        ? whatsappAccounts.map(a => a.id === id ? newAcc : a)
+        : [...whatsappAccounts, newAcc];
+      setWhatsappAccounts(updatedAccounts);
+      localStorage.setItem('crm_whatsapp_accounts', JSON.stringify(updatedAccounts));
+      
+      setWhatsappForm({
+        name: "",
+        origin: "",
+        color: "#25D366",
+        phoneNumber: "",
+        identifier: ""
+      });
+      setIsSavingWhatsapp(false);
+      return;
+    }
+
+    if (!effectiveWorkspaceId) {
+      alert("ID da workspace de destino não encontrado. Faça login ou verifique suas permissões.");
+      setIsSavingWhatsapp(false);
+      return;
+    }
 
     try {
       await setDoc(doc(db, `users/${effectiveWorkspaceId}/whatsappAccounts`, id), {
@@ -711,19 +743,23 @@ export default function App() {
         phoneNumber: "",
         identifier: ""
       });
-      // Don't close immediately so user can see it's done if they have more to add? 
-      // Actually common pattern is to just keep it open or show success.
-      // Let's just reset the form and show the list.
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${effectiveWorkspaceId}/whatsappAccounts/${id}`);
-      alert("Erro ao salvar conta. Verifique sua conexão.");
+      alert("Erro ao salvar conta de WhatsApp. Por favor, verifique suas permissões do Firebase.");
     } finally {
       setIsSavingWhatsapp(false);
     }
   };
 
   const deleteWhatsappAccount = async (id: string) => {
-    if (!user || !effectiveWorkspaceId) return;
+    if (!user) {
+      const updatedAccounts = whatsappAccounts.filter(a => a.id !== id);
+      setWhatsappAccounts(updatedAccounts);
+      localStorage.setItem('crm_whatsapp_accounts', JSON.stringify(updatedAccounts));
+      return;
+    }
+
+    if (!effectiveWorkspaceId) return;
     try {
       await deleteDoc(doc(db, `users/${effectiveWorkspaceId}/whatsappAccounts`, id));
     } catch (error) {
@@ -809,7 +845,7 @@ export default function App() {
   }, [authReady, effectiveWorkspaceId]);
 
   useEffect(() => {
-    if (!authReady || !effectiveWorkspaceId) return;
+    if (!authReady) return;
 
     if (!user) {
       const saved = localStorage.getItem('crm_client_tags');
@@ -829,6 +865,8 @@ export default function App() {
       }
       return;
     }
+
+    if (!effectiveWorkspaceId) return;
 
     const unsubscribe = onSnapshot(collection(db, `users/${effectiveWorkspaceId}/tags`), (snapshot) => {
       const dbTags: Record<string, ClientTag | null> = {};
