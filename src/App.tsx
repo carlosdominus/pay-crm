@@ -925,7 +925,7 @@ export default function App() {
   }, [authReady, user, effectiveWorkspaceId, clientExtraData]);
 
   const toggleTag = async (clientKey: string, tag: ClientTag) => {
-    if (!effectiveWorkspaceId) return;
+    if (user && !effectiveWorkspaceId) return;
     
     // Use functional update to ensure we have the absolute latest state
     let resolvedNewTag: ClientTag | null = null;
