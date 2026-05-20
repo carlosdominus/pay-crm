@@ -581,7 +581,15 @@ export default function App() {
   
   // Tagging state
   useEffect(() => {
-    if (!authReady || !effectiveWorkspaceId) {
+    if (!authReady) return;
+
+    if (!user) {
+      const saved = localStorage.getItem('crm_client_extra_data');
+      setClientExtraData(saved ? JSON.parse(saved) : {});
+      return;
+    }
+
+    if (!effectiveWorkspaceId) {
       setClientExtraData({});
       return;
     }
@@ -616,7 +624,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [authReady, effectiveWorkspaceId]);
+  }, [authReady, user, effectiveWorkspaceId]);
 
   const addInteractionLog = async (clientKey: string, type: InteractionLog['type'], content: string) => {
     if (!user || !effectiveWorkspaceId) return;
@@ -768,21 +776,30 @@ export default function App() {
   };
 
   const updateClientExtra = async (clientKey: string, updates: { trackingCode?: string; assignedWhatsappId?: string }) => {
-    if (!user) return;
-    try {
-      const docRef = doc(db, `users/${effectiveWorkspaceId}/clientData`, clientKey);
-      const currentData = clientExtraData[clientKey] || {};
-      const newData = {
-        clientKey,
-        ...currentData,
-        ...updates,
-        updatedAt: new Date().toISOString()
-      };
-      
-      await setDoc(docRef, newData, { merge: true });
+    const currentData = clientExtraData[clientKey] || {};
+    const newData = {
+      clientKey,
+      ...currentData,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
 
-      if (updates.trackingCode) {
-        addInteractionLog(clientKey, 'tracking_code', `Código de rastreio atualizado: ${updates.trackingCode}`);
+    try {
+      if (user) {
+        if (!effectiveWorkspaceId) return;
+        const docRef = doc(db, `users/${effectiveWorkspaceId}/clientData`, clientKey);
+        await setDoc(docRef, newData, { merge: true });
+
+        if (updates.trackingCode) {
+          addInteractionLog(clientKey, 'tracking_code', `Código de rastreio atualizado: ${updates.trackingCode}`);
+        }
+      } else {
+        // Local storage persist for guest/offline mode
+        const updatedData = {
+          ...clientExtraData,
+          [clientKey]: newData
+        };
+        localStorage.setItem('crm_client_extra_data', JSON.stringify(updatedData));
       }
 
       // Local update for immediate feedback
@@ -811,8 +828,12 @@ export default function App() {
         }
       }
     } catch (error) {
-      // @ts-ignore
-      handleFirestoreError(error, OperationType.WRITE, `users/${effectiveWorkspaceId}/clientData/${clientKey}`);
+      if (user) {
+        // @ts-ignore
+        handleFirestoreError(error, OperationType.WRITE, `users/${effectiveWorkspaceId}/clientData/${clientKey}`);
+      } else {
+        console.error("Erro ao salvar dados offline do cliente:", error);
+      }
     }
   };
 
