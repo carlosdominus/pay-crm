@@ -1,0 +1,69 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isPartner(ownerId) {
+      return isSignedIn() && (
+        (
+          exists(/databases/$(database)/documents/workspaceConfig/$(ownerId)) &&
+          get(/databases/$(database)/documents/workspaceConfig/$(ownerId)).data.domainAccessEnabled == true &&
+          get(/databases/$(database)/documents/workspaceConfig/$(ownerId)).data.ownerDomain == request.auth.token.email.split('@')[1]
+        ) ||
+        exists(/databases/$(database)/documents/partnerships/$(ownerId + "_" + request.auth.uid))
+      );
+    }
+
+    // --- Core User Data (Accessible by Owner and Partners) ---
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if isOwner(userId) || isPartner(userId);
+    }
+
+    // --- Workspace Management ---
+    
+    match /workspaceConfig/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    match /workspaceKeys/{key} {
+      allow get: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && (
+        (resource == null && request.resource.data.ownerUid == request.auth.uid) || 
+        (resource != null && resource.data.ownerUid == request.auth.uid)
+      );
+    }
+
+    match /domainWorkspaces/{domain} {
+      allow get: if isSignedIn();
+      allow create, update, delete: if isSignedIn() && (
+        (resource == null && request.resource.data.ownerUid == request.auth.uid) || 
+        (resource != null && resource.data.ownerUid == request.auth.uid)
+      );
+    }
+
+    match /partnerships/{partnershipId} {
+      // Allows owner or partner to manage the connection
+      allow read: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.partnerUid == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.partnerUid == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || resource.data.partnerUid == request.auth.uid);
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isSignedIn() && (resource.data.ownerUid == request.auth.uid || request.auth.token.email.lower() == resource.data.inviteeEmail.lower());
+      allow create: if isSignedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}

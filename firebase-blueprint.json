@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "UserTag": {
+      "title": "User Tag",
+      "description": "Tags assigned to clients (e.g., pending, done, trash)",
+      "type": "object",
+      "properties": {
+        "clientKey": { "type": "string" },
+        "tag": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientKey", "tag", "updatedAt"]
+    },
+    "ManualSale": {
+      "title": "Manual Sale",
+      "description": "Sales recorded manually by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientKey": { "type": "string" },
+        "productName": { "type": "string" },
+        "value": { "type": "number" },
+        "commission": { "type": "number" },
+        "date": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "clientKey", "productName", "value", "commission", "date", "timestamp"]
+    },
+    "WhatsAppAccount": {
+      "title": "WhatsApp Account",
+      "description": "Registered WhatsApp accounts for lead management",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "origin": { "type": "string" },
+        "color": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "identifier": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "phoneNumber", "identifier", "color"]
+    },
+    "ClientData": {
+      "title": "Client Extra Data",
+      "description": "Additional data for clients like tracking codes and assigned WA",
+      "type": "object",
+      "properties": {
+        "clientKey": { "type": "string" },
+        "trackingCode": { "type": "string" },
+        "assignedWhatsappId": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clientKey", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/tags/{clientKey}": {
+      "schema": "UserTag",
+      "description": "Client tags for a specific user"
+    },
+    "/users/{userId}/sales/{saleId}": {
+      "schema": "ManualSale",
+      "description": "Manual sales for a specific user"
+    },
+    "/users/{userId}/whatsappAccounts/{accId}": {
+      "schema": "WhatsAppAccount",
+      "description": "WhatsApp accounts managed by the user"
+    },
+    "/users/{userId}/clientData/{clientKey}": {
+      "schema": "ClientData",
+      "description": "Extra client-specific data"
+    }
+  }
+}

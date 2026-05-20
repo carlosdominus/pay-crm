@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- User Tags ---
+    match /users/{userId}/tags/{clientKey} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) 
+        && isValidId(clientKey)
+        && isValidUserTag(incoming())
+        && incoming().clientKey == clientKey;
+      allow update: if isOwner(userId)
+        && isValidUserTag(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['tag', 'updatedAt'])
+        && incoming().clientKey == existing().clientKey;
+      allow delete: if isOwner(userId);
+
+      function isValidUserTag(data) {
+        return data.keys().hasAll(['clientKey', 'tag', 'updatedAt'])
+          && data.keys().size() == 3
+          && data.clientKey is string && data.clientKey.size() <= 128
+          && data.tag in ['pendente', 'vendido', 'lixo']
+          && data.updatedAt is string;
+      }
+    }
+
+    // --- Manual Sales ---
+    match /users/{userId}/sales/{saleId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && isValidId(saleId)
+        && isValidManualSale(incoming())
+        && incoming().id == saleId;
+      allow update: if isOwner(userId)
+        && isValidManualSale(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['productName', 'value', 'commission', 'date', 'timestamp'])
+        && incoming().id == existing().id
+        && incoming().clientKey == existing().clientKey;
+      allow delete: if isOwner(userId);
+
+      function isValidManualSale(data) {
+        return data.keys().hasAll(['id', 'clientKey', 'productName', 'value', 'commission', 'date', 'timestamp'])
+          && (data.keys().size() == 7 || (data.keys().size() == 8 && data.keys().hasAll(['createdAt'])))
+          && data.id is string && data.id.size() <= 128
+          && data.clientKey is string && data.clientKey.size() <= 128
+          && data.productName is string && data.productName.size() <= 200
+          && data.value is number && data.value >= 0
+          && data.commission is number && data.commission >= 0
+          && data.date is string
+          && data.timestamp is number;
+      }
+    }
+  }
+}
