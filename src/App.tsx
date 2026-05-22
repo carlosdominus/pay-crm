@@ -1220,7 +1220,7 @@ export default function App() {
               normalizedStatus = 'Recusado';
             } else if (rawStatus === 'reembolsado' || rawStatus === 'devolvido') {
               normalizedStatus = 'Reembolsado';
-            } else if (rawStatus === 'abandonado' || rawStatus === 'carrinho abandonado' || rawStatus === 'lost_cart') {
+            } else if (rawStatus === 'abandonado' || rawStatus === 'carrinho abandonado' || rawStatus === 'lost_cart' || rawStatus === '12') {
               normalizedStatus = 'Carrinho Abandonado';
             } else if (rawStatus.startsWith('expired') || rawStatus === 'expirado') {
               normalizedStatus = 'Expirado';
